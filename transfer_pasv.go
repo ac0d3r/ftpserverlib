@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fclairamb/ftpserverlib/gonet"
+
 	log "github.com/fclairamb/go-log"
 )
 
@@ -28,13 +30,13 @@ type transferHandler interface {
 
 // Passive connection
 type passiveTransferHandler struct {
-	listener    net.Listener     // TCP or SSL Listener
-	tcpListener *net.TCPListener // TCP Listener (only keeping it to define a deadline during the accept)
-	Port        int              // TCP Port we are listening on
-	connection  net.Conn         // TCP Connection established
-	settings    *Settings        // Settings
-	info        string           // transfer info
-	logger      log.Logger       // Logger
+	listener    net.Listener // TCP or SSL Listener
+	tcpListener net.Listener // TCP Listener (only keeping it to define a deadline during the accept)
+	Port        int          // TCP Port we are listening on
+	connection  net.Conn     // TCP Connection established
+	settings    *Settings    // Settings
+	info        string       // transfer info
+	logger      log.Logger   // Logger
 	// data connection requirement checker
 	checkDataConn func(dataConnIP net.IP, channelType DataChannel) error
 }
@@ -79,7 +81,7 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 // ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection
 var ErrNoAvailableListeningPort = errors.New("could not find any port to listen to")
 
-func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.TCPListener, error) {
+func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (net.Listener, error) {
 	nbAttempts := portRange.End - portRange.Start
 
 	// Making sure we trying a reasonable amount of ports before giving up
@@ -92,15 +94,15 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	for i := 0; i < nbAttempts; i++ {
 		//nolint: gosec
 		port := portRange.Start + rand.Intn(portRange.End-portRange.Start+1)
-		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
+		// laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 
-		if errResolve != nil {
-			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
+		// if errResolve != nil {
+		// 	c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
 
-			return nil, fmt.Errorf("could not resolve port %d: %w", port, errResolve)
-		}
+		// 	return nil, fmt.Errorf("could not resolve port %d: %w", port, errResolve)
+		// }
 
-		tcpListener, errListen := net.ListenTCP("tcp", laddr)
+		tcpListener, errListen := gonet.ListenTCP(port)
 		if errListen == nil {
 			return tcpListener, nil
 		}
@@ -118,9 +120,9 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 
 func (c *clientHandler) handlePASV(param string) error {
 	command := c.GetLastCommand()
-	addr, _ := net.ResolveTCPAddr("tcp", ":0")
+	// addr, _ := net.ResolveTCPAddr("tcp", ":0")
 
-	var tcpListener *net.TCPListener
+	var tcpListener net.Listener
 	var err error
 
 	portRange := c.server.settings.PassiveTransferPortRange
@@ -128,7 +130,7 @@ func (c *clientHandler) handlePASV(param string) error {
 	if portRange != nil {
 		tcpListener, err = c.findListenerWithinPortRange(portRange)
 	} else {
-		tcpListener, err = net.ListenTCP("tcp", addr)
+		tcpListener, err = gonet.ListenTCP(0)
 	}
 
 	if err != nil {
@@ -202,9 +204,10 @@ func (c *clientHandler) handlePASV(param string) error {
 func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, error) {
 	if p.connection == nil {
 		var err error
-		if err = p.tcpListener.SetDeadline(time.Now().Add(wait)); err != nil {
-			return nil, fmt.Errorf("failed to set deadline: %w", err)
-		}
+		// TODO
+		// if err = p.tcpListener.SetDeadline(time.Now().Add(wait)); err != nil {
+		// 	return nil, fmt.Errorf("failed to set deadline: %w", err)
+		// }
 
 		p.connection, err = p.listener.Accept()
 
