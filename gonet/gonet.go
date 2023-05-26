@@ -16,10 +16,8 @@ var (
 	m *Manager
 )
 
-func NewManager(passiveConns sync.Map) *Manager {
-	return &Manager{
-		passiveConns: passiveConns,
-	}
+func InitManager(passiveConns sync.Map) {
+	m = &Manager{passiveConns: passiveConns}
 }
 
 func ListenTCP(port int) (net.Listener, error) {
