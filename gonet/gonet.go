@@ -33,10 +33,6 @@ func ListenTCP(port int) (net.Listener, error) {
 			if conns, ok := v.(chan net.Conn); ok {
 				return NewGoListener(context.Background(),
 					port,
-					func() {
-						fmt.Printf("delete port %d\n", port)
-						m.used.Delete(port)
-					},
 					conns), nil
 			}
 		}
@@ -55,14 +51,12 @@ type GoListener struct {
 	ctx   context.Context
 	conns <-chan net.Conn
 
-	closed  chan struct{}
-	closedf func()
-	port    int
+	closed chan struct{}
+	port   int
 }
 
 func NewGoListener(ctx context.Context,
 	port int,
-	closedf func(),
 	conns <-chan net.Conn) net.Listener {
 	return &GoListener{
 		ctx:    ctx,
@@ -87,10 +81,11 @@ func (g *GoListener) Accept() (net.Conn, error) {
 }
 
 func (g *GoListener) Close() error {
-	close(g.closed)
-	if g.closedf != nil {
-		g.closedf()
+	if m != nil {
+		m.used.Delete(g.port)
 	}
+
+	close(g.closed)
 	return nil
 }
 
