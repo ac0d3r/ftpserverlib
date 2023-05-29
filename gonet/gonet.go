@@ -25,9 +25,10 @@ func ListenTCP(port int) (net.Listener, error) {
 		m.used.Store(port, struct{}{})
 		if v, ok := m.passiveConns.Load(port); ok {
 			if conns, ok := v.(chan net.Conn); ok {
-				return NewGoListener(context.Background(), func() {
-					m.used.Delete(port)
-				}, conns), nil
+				return NewGoListener(context.Background(),
+					port,
+					func() { m.used.Delete(port) },
+					conns), nil
 			}
 		}
 	}
@@ -47,13 +48,16 @@ type GoListener struct {
 
 	closed  chan struct{}
 	closedf func()
+	port    int
 }
 
 func NewGoListener(ctx context.Context,
+	port int,
 	closedf func(),
 	conns <-chan net.Conn) net.Listener {
 	return &GoListener{
 		ctx:    ctx,
+		port:   port,
 		conns:  conns,
 		closed: make(chan struct{}),
 	}
@@ -82,5 +86,5 @@ func (g *GoListener) Close() error {
 }
 
 func (g *GoListener) Addr() net.Addr {
-	return nil
+	return &net.TCPAddr{IP: net.IPv4zero, Port: g.port}
 }
