@@ -3,7 +3,7 @@ package gonet
 import (
 	"context"
 	"errors"
-	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -22,11 +22,6 @@ func InitManager(passiveConns sync.Map) {
 }
 
 func ListenTCP(port int) (net.Listener, error) {
-	m.used.Range(func(key, value interface{}) bool {
-		fmt.Println(key, value)
-		return true
-	})
-
 	if _, ok := m.used.Load(port); !ok {
 		m.used.Store(port, struct{}{})
 		if v, ok := m.passiveConns.Load(port); ok {
@@ -70,7 +65,7 @@ func (g *GoListener) Accept() (net.Conn, error) {
 	select {
 	case _, ok := <-g.closed:
 		if !ok {
-			return nil, ErrGoListenerClosed
+			return nil, io.EOF
 		}
 	case <-g.ctx.Done():
 		return nil, g.ctx.Err()
